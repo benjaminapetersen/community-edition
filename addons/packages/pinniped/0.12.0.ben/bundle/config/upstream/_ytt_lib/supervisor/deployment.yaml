@@ -58,7 +58,8 @@ metadata:
   namespace: #@ namespace()
   labels: #@ labels()
   annotations:
-    "happy-day": "its-only-tuesday"
+    foobar: baz
+    ninny: hammers
 spec:
   replicas: #@ data.values.replicas
   selector:
