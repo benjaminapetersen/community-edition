@@ -1,6 +1,7 @@
 #@ load("@ytt:data", "data")
 #@ load("/libs/constants.lib.yaml", "pinniped_supervisor_namespace")
 
+#@ if data.values.identity_management_type != "none":
 #@ if data.values.tkg_cluster_role != "workload":
 ---
 apiVersion: config.supervisor.pinniped.dev/v1alpha1
@@ -10,4 +11,5 @@ metadata:
   namespace: #@ pinniped_supervisor_namespace()
 spec:
   issuer: #@ data.values.pinniped.supervisor_svc_endpoint
+#@ end
 #@ end

@@ -18,5 +18,7 @@ https_proxy: #@ data.values.https_proxy
 no_proxy: #@ data.values.no_proxy
 #@ end
 
+#@ if data.values.identity_management_type != "none":
 #! render yaml from vendored lib with data values
 --- #@ template.replace(pinniped_concierge_lib.with_data_values(pinniped_concierge_values()).eval())
+#@ end

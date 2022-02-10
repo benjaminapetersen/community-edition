@@ -1,5 +1,6 @@
 #@ load("@ytt:data", "data")
 
+#@ if data.values.identity_management_type != "none":
 ---
 apiVersion: authentication.concierge.pinniped.dev/v1alpha1
 kind: JWTAuthenticator
@@ -10,3 +11,4 @@ spec:
   issuer: #@ data.values.pinniped.supervisor_svc_endpoint
   tls:
     certificateAuthorityData: #@ data.values.pinniped.supervisor_ca_bundle_data
+#@ end

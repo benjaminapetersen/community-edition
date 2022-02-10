@@ -1,4 +1,7 @@
+#@ load("@ytt:data", "data")
+
 #! This rbac is to make sure unauthenticated user could read the pinniped-info, so that they could fetch the Pinniped supervisor information and its ca bundle data
+#@ if data.values.identity_management_type != "none":
 ---
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
@@ -25,3 +28,4 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: pinniped:view-pinnipedinfo
+#@ end

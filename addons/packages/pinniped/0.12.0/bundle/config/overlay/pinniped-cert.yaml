@@ -18,6 +18,7 @@
 #@   end
 #@ end
 
+#@ if data.values.identity_management_type != "none":
 #@ if data.values.tkg_cluster_role != "workload":
 
 #@ pinniped_self_signed_ca_issuer = pinniped_name() + "-selfsigned-ca-issuer"
@@ -49,4 +50,5 @@
 --- #@ certificate_generate_args(get_certificate_with_params, pinniped_cert_name(), pinniped_supervisor_namespace(), pinniped_cert_duration, pinniped_cert_renew_before, pinniped_secret_name, [pinniped_organization], pinniped_ca_common_name, pinniped_dns_list(), pinniped_ca_issuer, "Issuer", (pinniped_isCA, pinniped_ip_address_list()))
 #@ end
 
+#@ end
 #@ end

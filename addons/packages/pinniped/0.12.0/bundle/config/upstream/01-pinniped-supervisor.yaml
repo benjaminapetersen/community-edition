@@ -19,8 +19,8 @@ no_proxy: #@ data.values.no_proxy
 #@ end
 
 #@ if data.values.tkg_cluster_role == "management":
-
+#@ if data.values.identity_management_type != "none":
 #! render yaml from vendored lib with data values, but only if this is a management cluster
 --- #@ template.replace(pinniped_supervisor_lib.with_data_values(pinniped_supervisor_values()).eval())
-
-#@ end #! 
+#@ end
+#@ end #!

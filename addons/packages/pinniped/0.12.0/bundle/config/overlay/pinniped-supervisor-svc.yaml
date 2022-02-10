@@ -1,3 +1,4 @@
+#@ load("@ytt:data", "data")
 #@ load("/values.star", "values", "get_pinniped_supervisor_service_type", "is_pinniped_supervisor_service_type_NodePort")
 #@ load("/libs/constants.lib.yaml", "pinniped_supervisor_namespace", "pinniped_supervisor_svc_name")
 
@@ -8,6 +9,7 @@
 #@ end
 #@ service_annotations = get_service_annotations()
 
+#@ if data.values.identity_management_type != "none":
 #@ if values.tkg_cluster_role != "workload":
 ---
 apiVersion: v1
@@ -28,4 +30,5 @@ spec:
       targetPort: 8443
       #@ if/end is_pinniped_supervisor_service_type_NodePort():
       nodePort: 31234
+#@ end
 #@ end
