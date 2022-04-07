@@ -10,7 +10,13 @@ def validate_pinniped():
   data.values.tkg_cluster_role in ("management", "workload") or assert.fail("tkg_cluster_role must be provided to be either 'management' or 'workload'")
   data.values.infrastructure_provider in ("vsphere", "azure", "aws") or assert.fail("infrastructure_provider must be provided to be either 'vsphere', 'azure' or 'aws'")
   if data.values.identity_management_type:
-    data.values.identity_management_type in ("oidc", "ldap") or assert.fail("identity_management_type must be provided to be either 'oidc' or 'ldap'")
+
+    if data.values.tkg_cluster_role == "management":
+      data.values.identity_management_type in ("oidc", "ldap") or assert.fail("identity_management_type for management clusters must be either 'oidc' or 'ldap'")
+    end
+    if data.values.tkg_cluster_role == "workload":
+      data.values.identity_management_type in ("none", "oidc", "ldap") or assert.fail("identity_management_type for workload clusters be either 'none', 'oidc' or 'ldap'")
+    end
   end
   if data.values.tkg_cluster_role == "workload":
     data.values.pinniped.supervisor_svc_endpoint or assert.fail("the pinniped.supervisor_svc_endpoint must be provided")
@@ -148,6 +154,23 @@ def validate_static_client() :
       getattr(client, "secret") or assert.fail("Dex staticClients should have secret")
     end
   end
+end
+
+def is_mgmt_cluster():
+  return data.values.tkg_cluster_role == "management"
+end
+
+def is_workload_cluster():
+  return data.values.tkg_cluster_role == "workload"
+end
+
+# at present we ignore identity_management_type as a render gate for mgmt clusters
+def render_on_mgmt_cluster():
+  return is_mgmt_cluster()
+end
+
+def render_on_workload_cluster():
+  return is_workload_cluster() and data.values.identity_management_type != "none"
 end
 
 #export
