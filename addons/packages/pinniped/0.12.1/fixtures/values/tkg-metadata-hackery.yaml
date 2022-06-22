@@ -1,0 +1,29 @@
+#@data/values
+#@overlay/match-child-defaults missing_ok=True
+
+#! Notes:
+#! - the workload cluster should honor a provided pinniped.concierge.audiece value. The audience
+#!   customization feature is specifically for workload clusters.
+#! - relevance: pinniped-package 0.12.1+
+#!   older pinniped packages will ignore this value.
+#!
+#! if we need to support generating a tkg-metadata file ourselves we will
+#! require more inputs that are generally irrelevant to pinniped itself.  This is
+#! unfortunate.  we could potentially
+---
+bom_name: "catdog"
+boms: [{"bom_name": "abyssinian", "bom_data": "green and blue"}, {"bom_name": "persian", "bom_data": "pink and purple"}]
+BUILD_EDITION: egyptian
+TKG_VERSION: modern feline
+CLUSTER_PLAN: dev
+TKG_CLUSTER_ROLE: workload
+CLUSTER_NAME: Mrs. Norris
+DISABLE_CRS_FOR_ADDON_TYPE: metadata/tkg
+TKG_DEFAULT_BOM: abyssinian
+PROVIDER_TYPE: vsphere
+infrastructure_provider: vsphere
+tkg_cluster_role: workload
+identity_management_type: oidc
+pinniped:
+  concierge:
+    audience: "tiny angry kittens TINY ANGRY KITTENS!!! 😾 😸 😾 😸"

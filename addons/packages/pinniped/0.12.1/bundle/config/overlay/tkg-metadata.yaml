@@ -1,0 +1,224 @@
+#@ load("@ytt:overlay", "overlay")
+#@ load("@ytt:data", "data")
+#@ load("@ytt:yaml", "yaml")
+#@ load("@ytt:template", "template")
+#@ load("@ytt:assert", "assert")
+#@ load("/values.star", "render_on_workload_cluster")
+
+#! Copied from add_cluster_metadata.yaml
+#! the tkg-metadata configmap has been used by the post-deploy job to obtain the name of workload
+#! clusters so that the JWTAuthenticator audience can be properly set.  The audience has been
+#! a value defined as <cluster-name> or <cluster-name>-<cluster-id>.
+#! tkg-metadata has been removed with the shift towards server-side templating instead of client-side
+#! templating. Since a better home has not been found, we have integrated it into the pinniped package.
+#! This is not an ideal long term solution as the pinniped package should not be creating resources
+#! in outside namespaces, but it allows us to avoid breaking changes while we determine an alternative.
+#! https://github.com/vmware-tanzu/tanzu-framework/blob/caa7f3df50f481ebd143c752d2671a8f4b1b10f8/pkg/v1/providers/ytt/02_addons/metadata/add_cluster_metadata.yaml
+#!
+#! helper functions copied from
+#! https://github.com/vmware-tanzu/tanzu-framework/blob/caa7f3df50f481ebd143c752d2671a8f4b1b10f8/pkg/v1/providers/ytt/lib/helpers.star
+#! this eliminates the need to copy an additional dependency
+#!
+#@ TKGSProductName = "VMware Tanzu Kubernetes Grid Service for vSphere"
+#@ TKGProductName = "VMware Tanzu Kubernetes Grid"
+#@
+#@ def get_default_tkg_bom_data():
+#@   for bom_entry in data.values.boms:
+#@     if bom_entry.bom_name == data.values.TKG_DEFAULT_BOM:
+#@       return bom_entry.bom_data
+#@     end
+#@   end
+#@   assert.fail("unable to find the default BOM file: " + data.values.TKG_DEFAULT_BOM)
+#@ end
+#@
+#@ def get_provider():
+#@   if data.values.PROVIDER_TYPE == "tkg-service-vsphere":
+#@     return "vsphere"
+#@   end
+#@   return data.values.PROVIDER_TYPE
+#@ end
+#@
+#@ def get_kubernetes_provider():
+#@   return TKGSProductName if data.values.PROVIDER_TYPE == "tkg-service-vsphere" else TKGProductName
+#@ end
+
+#@ if data.values.PROVIDER_TYPE != "tkg-service-vsphere":
+
+#@ def tkgmetadataoverlay():
+
+#@overlay/match by=overlay.all,expects="1+"
+---
+#@overlay/match missing_ok=True
+metadata:
+ #@overlay/match missing_ok=True
+ annotations:
+  #@overlay/match missing_ok=True
+  tkg.tanzu.vmware.com/addon-type: "metadata/tkg"
+
+#@ end
+
+
+#@ def get_bom_configmap():
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: tkg-bom
+ namespace: tkg-system-public
+data:
+ bom.yaml: #@ yaml.encode(get_default_tkg_bom_data())
+#@ end
+
+#@ def get_metadata():
+---
+cluster:
+ name: #@ data.values.CLUSTER_NAME
+ type: #@ data.values.TKG_CLUSTER_ROLE
+ plan: #@ data.values.CLUSTER_PLAN
+ kubernetesProvider: #@ get_kubernetes_provider()
+ tkgVersion: #@ data.values.TKG_VERSION
+ edition: #@ data.values.BUILD_EDITION
+ infrastructure:
+  provider: #@ get_provider()
+bom:
+ configmapRef:
+  name: tkg-bom
+#@ end
+
+#@ def get_metadata_configmap():
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: tkg-metadata
+ namespace: tkg-system-public
+data:
+ metadata.yaml: #@ yaml.encode(get_metadata())
+#@ end
+
+
+#@ def get_metadata_namespace_role():
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+ name: tkg-system-public
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+ name: tkg-metadata-reader
+ namespace: tkg-system-public
+rules:
+- apiGroups:
+  - ""
+  resourceNames:
+  - tkg-metadata
+  - tkg-bom
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+ name: tkg-metadata-reader
+ namespace: tkg-system-public
+roleRef:
+ apiGroup: rbac.authorization.k8s.io
+ kind: Role
+ name: tkg-metadata-reader
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authenticated
+#@ end
+
+#@ def get_metadata_crs_name():
+#@ return "{}-tkg-metadata".format(data.values.CLUSTER_NAME)
+#@ end
+
+
+#@ def get_metadata_crs_secret_namespace_role_name():
+#@ return "{}-namespace-role".format(get_metadata_crs_name())
+#@ end
+
+#@ def get_metadata_crs_secret_configmap_name():
+#@ return "{}-configmap".format(get_metadata_crs_name())
+#@ end
+
+#@ def get_metadata_crs_secret_bom_configmap_name():
+#@ return "{}-bom-configmap".format(get_metadata_crs_name())
+#@ end
+
+#@ if render_on_workload_cluster():
+
+#@ if data.values.DISABLE_CRS_FOR_ADDON_TYPE and "metadata/tkg" in data.values.DISABLE_CRS_FOR_ADDON_TYPE:
+--- #@ template.replace(overlay.apply(get_metadata_namespace_role(),tkgmetadataoverlay()))
+--- #@ template.replace(overlay.apply(get_metadata_configmap(),tkgmetadataoverlay()))
+--- #@ template.replace(overlay.apply(get_bom_configmap(),tkgmetadataoverlay()))
+
+#@ else:
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+ name: #@ get_metadata_crs_secret_namespace_role_name()
+ annotations:
+  tkg.tanzu.vmware.com/addon-type: "metadata/tkg"
+type: addons.cluster.x-k8s.io/resource-set
+stringData:
+ value: #@ yaml.encode(overlay.apply(get_metadata_namespace_role(),tkgmetadataoverlay()))
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+ name: #@ get_metadata_crs_secret_configmap_name()
+ annotations:
+  tkg.tanzu.vmware.com/addon-type: "metadata/tkg"
+type: addons.cluster.x-k8s.io/resource-set
+stringData:
+ value: #@ yaml.encode(overlay.apply(get_metadata_configmap(),tkgmetadataoverlay()))
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+ name: #@ get_metadata_crs_secret_bom_configmap_name()
+ annotations:
+  tkg.tanzu.vmware.com/addon-type: "metadata/tkg"
+type: addons.cluster.x-k8s.io/resource-set
+stringData:
+ value: #@ yaml.encode(overlay.apply(get_bom_configmap(),tkgmetadataoverlay()))
+
+---
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+ name: #@ get_metadata_crs_name()
+ labels:
+  cluster.x-k8s.io/cluster-name: #@ data.values.CLUSTER_NAME
+ annotations:
+  tkg.tanzu.vmware.com/addon-type: "metadata/tkg"
+spec:
+ strategy: "ApplyOnce"
+ clusterSelector:
+  matchLabels:
+   tkg.tanzu.vmware.com/cluster-name: #@ data.values.CLUSTER_NAME
+ resources:
+ - name: #@ get_metadata_crs_secret_namespace_role_name()
+   kind: Secret
+ - name: #@ get_metadata_crs_secret_configmap_name()
+   kind: Secret
+ - name: #@ get_metadata_crs_secret_bom_configmap_name()
+   kind: Secret
+#@ end
+
+#@ end
+
+#@ end
