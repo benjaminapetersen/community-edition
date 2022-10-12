@@ -60,6 +60,29 @@ roleRef:
 apiVersion: batch/v1
 kind: Job
 metadata:
+  #! TODO: can we append the get_hash() to the name, which will do a sha256.sum(yaml.encode(data.values))
+  #! and cause name to be something like pinniped-post-deploy-job-1a2b3c?
+  #! This would ensure that every time config changes an entirely NEW JOB is created, and the old job
+  #! will be deleted.  This is necessary because Kubernetes does not provide a mechanism for causing a
+  #! job to run again.  This means that it is extremely easy for Pinniped Package to get out of sync.
+  #! Commonly the FederationDomain, OIDCIdentityProvider and JWTAuthenticators will have incorrect
+  #! values.
+  #! Sometimes the Job will run again, and sometimes it does not.
+  #! Sometimes kapp-controller will execute the YTT templates again causing certain values to revert to
+  #! incorrect values, such as a default 0.0.0.0 IP address.  Since post-deploy does not run again when
+  #! this happens, good config can be lost.
+  #! The necessary fix options are:
+  #! - 1. Move all Post-Deploy Job code to a controller.  This would allow for it to watch and actively reconcile.
+  #!   - this is likely the most effort/most expensive
+  #! - 2. Use the get_hash() function to force unique names to ensure new post-deploy jobs run
+  #!   - this may have some side effects
+  #!     - is there anything depending on the post-deploy job name?  there should not be, it is not supposed to be public
+  #! - 3. Add a CronJob that runs the same container image as the post-deploy Job
+  #!     - this could run every 5 minutes and be a resync to ensure that configuration remains correct.
+  #!     - this would help the package emulate a proper controller without having to rewrite the job as a controller
+  #! Potential snags:
+  #! - 1. Is there ever a time when the post-deploy runs and reverts something back to a default value?
+  #!      I do recall a "gotcha" of this type somewhere in the flow, but I don't recall if it was post-deploy related.
   name: #@ post_deploy_job_name()
   namespace: #@ pinniped_supervisor_namespace()
 spec:
